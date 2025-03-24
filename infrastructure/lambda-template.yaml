@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Ship Micro-Motion Analysis System - Lambda Function'
+
+Parameters:
+  LambdaExecutionRoleArn:
+    Type: String
+    Description: ARN of the Lambda execution role
+
+Resources:
+  # Lambda Layer for Python Dependencies
+  SARProcessingLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: ship-mm-python-dependencies
+      Description: Python dependencies for Ship Micro-Motion processing
+      CompatibleRuntimes:
+        - python3.9
+      Content:
+        S3Bucket: ship-mm-uploads
+        S3Key: lambda-layers/python-dependencies.zip
+      LicenseInfo: MIT
+
+  # Lambda Function for SAR Processing
+  SARProcessingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ship-mm-sar-processing
+      Handler: lambda_handler.handler
+      Role: !Ref LambdaExecutionRoleArn
+      Runtime: python3.9
+      Timeout: 300
+      MemorySize: 1024
+      Layers:
+        - !Ref SARProcessingLayer
+      Environment:
+        Variables:
+          UPLOADS_BUCKET: ship-mm-uploads
+          RESULTS_BUCKET: ship-mm-results
+          JOBS_TABLE: ShipMMJobs
+      Code:
+        S3Bucket: ship-mm-uploads
+        S3Key: lambda/sar-processing.zip
+      Tags:
+        - Key: Project
+          Value: ShipMicroMotion
+
+Outputs:
+  SARProcessingFunctionArn:
+    Description: ARN of the SAR Processing Lambda function
+    Value: !GetAtt SARProcessingFunction.Arn
+
+  SARProcessingLayerArn:
+    Description: ARN of the Python dependencies layer
+    Value: !Ref SARProcessingLayer 
