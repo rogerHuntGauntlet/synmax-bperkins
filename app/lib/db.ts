@@ -1,7 +1,7 @@
 // This file contains utilities for database operations
-// Using Vercel KV (Redis) for storage
+// Using Redis for storage
 
-import { kv } from '@vercel/kv';
+import { createClient } from 'redis';
 
 // Job status constants
 export const JOB_STATUS = {
@@ -24,10 +24,34 @@ export interface JobData {
   metadata?: Record<string, any>;
 }
 
+// Redis client initialization
+let redisClient: ReturnType<typeof createClient> | null = null;
+
+// Initialize Redis client
+export async function getRedisClient() {
+  if (!redisClient) {
+    redisClient = createClient({
+      url: process.env.REDIS_URL,
+      socket: {
+        reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
+      },
+    });
+    
+    redisClient.on('error', (err) => {
+      console.error('Redis Client Error', err);
+    });
+    
+    await redisClient.connect();
+  }
+  
+  return redisClient;
+}
+
 /**
  * Create a new job in the database
  */
 export async function createJob(jobId: string, metadata?: Record<string, any>): Promise<JobData> {
+  const redis = await getRedisClient();
   const now = new Date().toISOString();
   const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7; // 7 days from now
 
@@ -40,8 +64,10 @@ export async function createJob(jobId: string, metadata?: Record<string, any>): 
     metadata,
   };
 
-  // Store in KV with TTL
-  await kv.set(`job:${jobId}`, jobData, { ex: 60 * 60 * 24 * 7 }); // 7 days expiry
+  // Store in Redis with TTL
+  const key = `job:${jobId}`;
+  await redis.set(key, JSON.stringify(jobData));
+  await redis.expire(key, 60 * 60 * 24 * 7); // 7 days expiry
   
   return jobData;
 }
@@ -54,6 +80,8 @@ export async function updateJob(
   status: string, 
   data?: Partial<JobData>
 ): Promise<JobData | null> {
+  const redis = await getRedisClient();
+  
   // Get existing job
   const job = await getJob(jobId);
   
@@ -69,12 +97,16 @@ export async function updateJob(
     ...data,
   };
   
-  // Save to KV with same TTL
+  // Save to Redis with same TTL
+  const key = `job:${jobId}`;
+  await redis.set(key, JSON.stringify(updatedJob));
+  
+  // Set expiration if available
   const ttl = updatedJob.expiresAt 
     ? Math.max(0, updatedJob.expiresAt - Math.floor(Date.now() / 1000))
     : 60 * 60 * 24 * 7; // Default 7 days
     
-  await kv.set(`job:${jobId}`, updatedJob, { ex: ttl });
+  await redis.expire(key, ttl);
   
   return updatedJob;
 }
@@ -83,14 +115,50 @@ export async function updateJob(
  * Get job data
  */
 export async function getJob(jobId: string): Promise<JobData | null> {
-  const jobData = await kv.get<JobData>(`job:${jobId}`);
-  return jobData;
+  const redis = await getRedisClient();
+  const key = `job:${jobId}`;
+  const data = await redis.get(key);
+  
+  if (!data) {
+    return null;
+  }
+  
+  try {
+    return JSON.parse(data) as JobData;
+  } catch (error) {
+    console.error(`Error parsing job data for ${jobId}:`, error);
+    return null;
+  }
 }
 
 /**
  * Delete a job
  */
 export async function deleteJob(jobId: string): Promise<boolean> {
-  const result = await kv.del(`job:${jobId}`);
+  const redis = await getRedisClient();
+  const key = `job:${jobId}`;
+  const result = await redis.del(key);
   return result === 1;
+}
+
+/**
+ * Scan for jobs matching pattern
+ */
+export async function scanJobs(pattern: string, count = 100): Promise<string[]> {
+  const redis = await getRedisClient();
+  
+  const keys = [];
+  let cursor = 0;
+  
+  do {
+    // @ts-expect-error - Redis types expect different return format
+    const result = await redis.scan(cursor, { MATCH: pattern, COUNT: count });
+    cursor = result.cursor;
+    
+    if (result.keys.length > 0) {
+      keys.push(...result.keys);
+    }
+  } while (cursor !== 0);
+  
+  return keys;
 } 

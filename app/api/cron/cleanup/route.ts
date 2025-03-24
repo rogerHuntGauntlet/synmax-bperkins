@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
-import { JobData } from '@/app/lib/db';
+import { JobData, getRedisClient, scanJobs } from '@/app/lib/db';
 
 // This endpoint is called by Vercel Cron to clean up expired jobs
 // Set up in vercel.json with schedule: "0 0 * * *" (daily at midnight)
@@ -12,42 +11,38 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Due to TTL in KV, many keys will auto-expire
+    // Due to TTL in Redis, many keys will auto-expire
     // This job handles any additional cleanup like removing old files
 
     // Get current timestamp
     const now = Math.floor(Date.now() / 1000);
     
-    // Get all job keys that are at least 30 days old
-    // Note: This might need pagination for large datasets
-    const cursor = 0; // Using number as expected by the type definitions
-    const scanResult = await kv.scan(cursor, {
-      match: 'job:*',
-      count: 100
-    });
+    // Get Redis client
+    const redis = await getRedisClient();
+    
+    // Get all job keys that match pattern
+    const jobKeys = await scanJobs('job:*');
     
     const keysToDelete: string[] = [];
     
-    // Scan results and find expired jobs
-    if (scanResult && Array.isArray(scanResult.keys)) {
-      for (const key of scanResult.keys) {
-        try {
-          const job = await kv.get<JobData>(key);
-          if (job && job.expiresAt) {
-            // Check if job is expired and hasn't been auto-cleaned
-            if (job.expiresAt < now - 60 * 60 * 24 * 30) { // 30 days past expiration
-              keysToDelete.push(key);
-            }
+    // Check each job and find expired ones
+    for (const key of jobKeys) {
+      try {
+        const jobData = await redis.get(key);
+        if (jobData) {
+          const job = JSON.parse(jobData) as JobData;
+          if (job && job.expiresAt && job.expiresAt < now - 60 * 60 * 24 * 30) { // 30 days past expiration
+            keysToDelete.push(key);
           }
-        } catch (error) {
-          console.error(`Error checking job ${key}:`, error);
         }
+      } catch (error) {
+        console.error(`Error checking job ${key}:`, error);
       }
     }
     
     // Delete expired jobs
     if (keysToDelete.length > 0) {
-      await Promise.all(keysToDelete.map(key => kv.del(key)));
+      await Promise.all(keysToDelete.map(key => redis.del(key)));
       console.log(`Deleted ${keysToDelete.length} expired jobs`);
     }
     
