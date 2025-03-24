@@ -70,22 +70,41 @@ export async function POST(request: NextRequest) {
       const resultData = await readFile(resultPath, 'utf-8');
       const results = JSON.parse(resultData);
       
-      // Find any figure files
+      // Find and read figure files
       const figureDir = `${uniqueId}-result_figures`;
       const figureDirPath = join(resultsDir, figureDir);
-      let figures: string[] = [];
+      const figureData: Record<string, string> = {};
       
       if (existsSync(figureDirPath)) {
         const fileList = fs.readdirSync(figureDirPath);
-        figures = fileList.map((file: string) => `/api/results/${uniqueId}/figures/${file}`);
+        
+        // Read each figure file and convert to base64
+        for (const figureFile of fileList) {
+          try {
+            const figureType = figureFile.includes('displacement') ? 'displacement' : 
+                              figureFile.includes('frequency') ? 'frequency' : 
+                              figureFile.split('.')[0]; // Use filename without extension
+            
+            const figureContentBuffer = await readFile(join(figureDirPath, figureFile));
+            const base64Data = figureContentBuffer.toString('base64');
+            const extension = figureFile.split('.').pop()?.toLowerCase() || 'png';
+            const mimeType = extension === 'png' ? 'image/png' : 
+                             extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 
+                             'application/octet-stream';
+            
+            figureData[figureType] = `data:${mimeType};base64,${base64Data}`;
+          } catch (err) {
+            console.error(`Error reading figure file ${figureFile}:`, err);
+          }
+        }
       }
       
-      // Return both the processing output and results
+      // Return processing output, results, and figure data
       return NextResponse.json({
         success: true,
         message: pythonOutput.join('\n'),
         results,
-        figures,
+        figures: figureData,
         id: uniqueId
       });
     } else {
