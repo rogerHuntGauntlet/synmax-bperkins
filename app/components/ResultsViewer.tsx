@@ -1,6 +1,7 @@
 'use client';
 
 import { ApiResponse, ProcessingResult, ShipResult } from '../types';
+import { MotionVisualization } from './MotionVisualization';
 
 interface ResultsViewerProps {
   data: ApiResponse;
@@ -42,6 +43,21 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
           />
         </div>
       </div>
+
+      {/* Display interactive visualizations for ships */}
+      {ships.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-bold mb-4">Interactive Analysis</h2>
+          <div className="space-y-8">
+            {ships.map((ship) => (
+              <div key={ship.ship_id} className="border-t pt-6 first:border-t-0 first:pt-0">
+                <h3 className="text-lg font-semibold mb-4">Ship {ship.ship_id + 1} Motion Visualization</h3>
+                <MotionVisualization shipData={ship} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Display base64 encoded figures */}
       {figures && Object.keys(figures).length > 0 && (

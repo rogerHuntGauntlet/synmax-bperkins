@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ResultsViewer } from './components/ResultsViewer';
 import { SampleData } from './components/SampleData';
+import { MotionVisualization } from './components/MotionVisualization';
 import { ApiResponse } from './types';
 
 interface SampleDataItem {
@@ -122,10 +123,20 @@ export default function Home() {
             )}
           </section>
           
-          {results && (
+          {results ? (
             <section className="bg-white p-6 rounded-lg shadow-md">
               <h2 className="text-xl font-bold mb-4">Results</h2>
               <ResultsViewer data={results} />
+            </section>
+          ) : (
+            <section className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-bold mb-4">Sample Visualization</h2>
+              <div className="p-4 bg-gray-50 rounded-md mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  This is a sample visualization. Upload a SAR image or select a sample dataset to see actual results.
+                </p>
+              </div>
+              <MotionVisualization showMockData={true} />
             </section>
           )}
           
