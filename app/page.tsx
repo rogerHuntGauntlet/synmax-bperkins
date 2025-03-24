@@ -34,25 +34,18 @@ export default function Home() {
         body: formData
       });
       
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
+      
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to process the image');
+      if (!data.success) {
+        throw new Error(data.error || 'Processing failed');
       }
       
-      if (data.success && data.sessionId) {
-        // Fetch the results and visualizations
-        const resultsResponse = await fetch(`/api/results/${data.sessionId}`);
-        const resultsData = await resultsResponse.json();
-        
-        if (!resultsResponse.ok) {
-          throw new Error(resultsData.error || 'Failed to retrieve results');
-        }
-        
-        setResults(resultsData);
-      } else {
-        setResults(data);
-      }
+      setResults(data);
     } catch (err) {
       console.error('Error processing image:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -68,55 +61,22 @@ export default function Home() {
     setDownloadProgress(`Downloading ${sample.name}...`);
     
     try {
-      // Step 1: Download the sample file
-      const downloadResponse = await fetch('/api/download', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: sample.url }),
-      });
+      // Use the updated API that directly processes the sample data
+      console.log(`Processing sample data from URL: ${sample.url}`);
+      const response = await fetch(`/api/download?url=${encodeURIComponent(sample.url)}`);
       
-      const downloadData = await downloadResponse.json();
-      
-      if (!downloadResponse.ok) {
-        throw new Error(downloadData.error || 'Failed to download sample data');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.details || `Server error: ${response.status}`);
       }
       
-      setDownloadProgress(`Processing ${sample.name}...`);
+      const data = await response.json();
       
-      // Step 2: Process the downloaded file
-      const processResponse = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          filePath: downloadData.filePath,
-          sessionId: downloadData.sessionId,
-          filename: downloadData.filename 
-        }),
-      });
-      
-      const processData = await processResponse.json();
-      
-      if (!processResponse.ok) {
-        throw new Error(processData.error || 'Failed to process the sample data');
+      if (!data.success) {
+        throw new Error(data.error || 'Processing failed');
       }
       
-      if (processData.success && processData.sessionId) {
-        // Step 3: Fetch the results and visualizations
-        const resultsResponse = await fetch(`/api/results/${processData.sessionId}`);
-        const resultsData = await resultsResponse.json();
-        
-        if (!resultsResponse.ok) {
-          throw new Error(resultsData.error || 'Failed to retrieve results');
-        }
-        
-        setResults(resultsData);
-      } else {
-        setResults(processData);
-      }
+      setResults(data);
     } catch (err) {
       console.error('Error processing sample data:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -150,21 +110,21 @@ export default function Home() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <p className="text-sm text-blue-700">{downloadProgress}</p>
+                  <span className="text-blue-700">{downloadProgress}</span>
                 </div>
               </div>
             )}
             
             {error && (
-              <div className="mt-4 bg-red-50 p-4 rounded-md">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="mt-4 bg-red-50 p-4 rounded-md text-red-700">
+                <strong>Error:</strong> {error}
               </div>
             )}
           </section>
           
           {results && (
             <section className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-bold mb-4">Analysis Results</h2>
+              <h2 className="text-xl font-bold mb-4">Results</h2>
               <ResultsViewer data={results} />
             </section>
           )}

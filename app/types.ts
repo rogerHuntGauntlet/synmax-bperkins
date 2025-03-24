@@ -24,9 +24,12 @@ export interface ProcessingResult {
 
 export interface ApiResponse {
   success: boolean;
-  sessionId: string;
+  id?: string;
+  sessionId?: string; // For backward compatibility
   message?: string;
   results?: ProcessingResult;
   error?: string;
-  figures?: string[];
+  details?: string;
+  figures?: Record<string, string>; // Now a dictionary of type -> base64 image
+  traceback?: string;
 } 

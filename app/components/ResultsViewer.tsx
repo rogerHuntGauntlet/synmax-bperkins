@@ -11,13 +11,14 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
     return (
       <div className="bg-red-50 p-4 rounded-md">
         <h3 className="text-lg font-medium text-red-800">Error</h3>
-        <p className="text-sm text-red-700 mt-1">{data?.error || 'Failed to process the image'}</p>
+        <p className="text-sm text-red-700 mt-1">{data?.error || data?.details || 'Failed to process the image'}</p>
       </div>
     );
   }
 
   const { results, figures } = data;
   const { metadata, ships } = results;
+  const sessionId = data.id || data.sessionId || 'unknown';
 
   return (
     <div className="space-y-8">
@@ -36,19 +37,41 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
           />
           <InfoCard 
             title="Session ID" 
-            value={data.sessionId.substring(0, 8)} 
+            value={sessionId.substring(0, 8)} 
             icon="🔑" 
           />
         </div>
       </div>
+
+      {/* Display base64 encoded figures */}
+      {figures && Object.keys(figures).length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-bold mb-4">Visualizations</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Object.entries(figures).map(([key, imgData]) => (
+              <div key={key} className="border rounded overflow-hidden">
+                <h3 className="text-md font-medium p-2 bg-gray-50 border-b capitalize">
+                  {key.replace(/_/g, ' ')}
+                </h3>
+                <div className="p-2">
+                  <img 
+                    src={imgData} 
+                    alt={`${key} visualization`} 
+                    className="w-full h-auto"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {ships.length > 0 ? (
         <div className="space-y-6">
           {ships.map((ship) => (
             <ShipResultCard 
               key={ship.ship_id} 
-              ship={ship} 
-              figures={getFiguresForShip(figures || [], ship.ship_id)} 
+              ship={ship}
             />
           ))}
         </div>
@@ -59,10 +82,6 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
       )}
     </div>
   );
-};
-
-const getFiguresForShip = (figures: string[], shipId: number): string[] => {
-  return figures.filter(url => url.includes(`ship_${shipId}_`));
 };
 
 interface InfoCardProps {
@@ -85,10 +104,9 @@ const InfoCard = ({ title, value, icon }: InfoCardProps) => (
 
 interface ShipResultCardProps {
   ship: ShipResult;
-  figures: string[];
 }
 
-const ShipResultCard = ({ ship, figures }: ShipResultCardProps) => {
+const ShipResultCard = ({ ship }: ShipResultCardProps) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <h3 className="text-lg font-bold mb-4">Ship {ship.ship_id + 1}</h3>
@@ -113,25 +131,6 @@ const ShipResultCard = ({ ship, figures }: ShipResultCardProps) => {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-        
-        <div>
-          <h4 className="text-md font-medium mb-2">Visualizations</h4>
-          <div className="space-y-4">
-            {figures.map((figure, idx) => (
-              <div key={idx} className="border rounded-md overflow-hidden">
-                <img 
-                  src={figure}
-                  alt={`Visualization ${idx + 1} for Ship ${ship.ship_id + 1}`}
-                  className="w-full h-auto"
-                />
-              </div>
-            ))}
-            
-            {figures.length === 0 && (
-              <p className="text-sm text-gray-500 italic">No visualizations available.</p>
-            )}
           </div>
         </div>
       </div>
