@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     console.log(`Downloading sample data from: ${url}`);
     
     // Use fetch directly to download the file
+    const startDownloadTime = Date.now();
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -29,6 +30,8 @@ export async function GET(request: NextRequest) {
     // Get the file data
     const fileData = await response.arrayBuffer();
     const buffer = Buffer.from(fileData);
+    const downloadDuration = ((Date.now() - startDownloadTime) / 1000).toFixed(2);
+    console.log(`Download completed in ${downloadDuration} seconds`);
     
     // Create form data to send to Python API
     const formData = new FormData();
@@ -38,6 +41,7 @@ export async function GET(request: NextRequest) {
     
     // Send to Python API for processing
     console.log(`Processing file at Python API: ${PYTHON_API_URL}/process`);
+    const processingStartTime = Date.now();
     const pythonResponse = await fetch(`${PYTHON_API_URL}/process`, {
       method: 'POST',
       body: formData,
@@ -50,7 +54,16 @@ export async function GET(request: NextRequest) {
     
     // Return the processed results
     const results = await pythonResponse.json();
-    return NextResponse.json(results);
+    const processingDuration = ((Date.now() - processingStartTime) / 1000).toFixed(2);
+    console.log(`Processing completed in ${processingDuration} seconds`);
+    
+    return NextResponse.json({
+      ...results,
+      timing: {
+        downloadTime: parseFloat(downloadDuration),
+        processingTime: parseFloat(processingDuration)
+      }
+    });
   } catch (error) {
     console.error('Error processing sample data:', error);
     return NextResponse.json(
@@ -79,6 +92,7 @@ export async function POST(request: NextRequest) {
     console.log(`Downloading file from: ${url}`);
     
     // Use fetch directly to download the file
+    const startDownloadTime = Date.now();
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -88,6 +102,8 @@ export async function POST(request: NextRequest) {
     // Get the file data
     const fileData = await response.arrayBuffer();
     const buffer = Buffer.from(fileData);
+    const downloadDuration = ((Date.now() - startDownloadTime) / 1000).toFixed(2);
+    console.log(`Download completed in ${downloadDuration} seconds`);
     
     // Create form data to send to Python API
     const formData = new FormData();
@@ -97,6 +113,7 @@ export async function POST(request: NextRequest) {
     
     // Send to Python API for processing
     console.log(`Processing file at Python API: ${PYTHON_API_URL}/process`);
+    const processingStartTime = Date.now();
     const pythonResponse = await fetch(`${PYTHON_API_URL}/process`, {
       method: 'POST',
       body: formData,
@@ -109,7 +126,16 @@ export async function POST(request: NextRequest) {
     
     // Return the processed results
     const results = await pythonResponse.json();
-    return NextResponse.json(results);
+    const processingDuration = ((Date.now() - processingStartTime) / 1000).toFixed(2);
+    console.log(`Processing completed in ${processingDuration} seconds`);
+    
+    return NextResponse.json({
+      ...results,
+      timing: {
+        downloadTime: parseFloat(downloadDuration),
+        processingTime: parseFloat(processingDuration)
+      }
+    });
   } catch (error) {
     console.error('Error downloading and processing file:', error);
     return NextResponse.json(

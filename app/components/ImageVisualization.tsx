@@ -11,14 +11,22 @@ interface ImageVisualizationProps {
 
 export const ImageVisualization = ({ imageData, ships = [], showMockData = false }: ImageVisualizationProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mockImage, setMockImage] = useState<string | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{
     shipId: number;
     x: number;
     y: number;
   } | null>(null);
   
-  // Generate a mock image if no real data is provided and mock data is requested
-  const imageSrc = imageData || (showMockData ? generateMockSARImage() : null);
+  // Generate mock image on client-side only
+  useEffect(() => {
+    if (showMockData && !imageData) {
+      setMockImage(generateMockSARImage());
+    }
+  }, [imageData, showMockData]);
+  
+  // Get the image source - either from props, mock data (client-side generated), or null
+  const imageSrc = imageData || mockImage;
   
   useEffect(() => {
     if (!canvasRef.current || !imageSrc) return;
@@ -150,7 +158,14 @@ function getColorForShip(shipId: number): string {
   return colors[shipId % colors.length];
 }
 
+// Client-side only function to generate a mock SAR image
 function generateMockSARImage(): string {
+  // Only run in browser environment
+  if (typeof document === 'undefined') {
+    // Return a tiny transparent image as a fallback for server rendering
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  }
+  
   // Create a mock SAR image
   const canvas = document.createElement('canvas');
   canvas.width = 600;

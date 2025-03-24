@@ -62,18 +62,21 @@ export const SampleData = ({ onSelect }: SampleDataProps) => {
         <div className="mt-3 grid grid-cols-1 gap-3">
           {SAMPLE_DATA.map((sample, index) => (
             <div 
-              key={index} 
+              key={index}
               className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => onSelect(sample)}
             >
               <div className="flex justify-between">
                 <h3 className="font-medium text-gray-900">{sample.name}</h3>
-                <span className="text-sm text-gray-500">{sample.size}</span>
+                <span className="text-sm font-medium px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{sample.size}</span>
               </div>
               <p className="text-sm text-gray-600 mt-1">{sample.description}</p>
-              <div className="flex items-center mt-2">
+              <div className="flex items-center justify-between mt-2">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {sample.format}
+                </span>
+                <span className="text-xs text-gray-500 italic">
+                  {sample.size.includes('GB') ? 'Large file - may take several minutes' : ''}
                 </span>
               </div>
             </div>

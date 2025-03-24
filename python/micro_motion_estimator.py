@@ -19,6 +19,8 @@ import cv2
 import rasterio
 import h5py
 from skimage import feature, transform, filters, exposure
+import io
+import base64
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -375,6 +377,19 @@ class MicroMotionEstimator:
                 'dominant_frequencies': frequency_analysis['dominant_frequencies'][:5]  # Top 5 frequencies
             }
             
+            # Ensure each dominant frequency has the expected format for the frontend
+            for freq in ship_result['dominant_frequencies']:
+                # Ensure frequency is a tuple/list of exactly 2 numbers
+                if not isinstance(freq['frequency'], (list, tuple)) or len(freq['frequency']) != 2:
+                    freq['frequency'] = [float(freq['frequency'][0]), float(freq['frequency'][1])]
+                
+                # Ensure peak_location is a tuple/list of exactly 2 numbers
+                if not isinstance(freq['peak_location'], (list, tuple)) or len(freq['peak_location']) != 2:
+                    freq['peak_location'] = [float(freq['peak_location'][0]), float(freq['peak_location'][1])]
+                
+                # Ensure amplitude is a float
+                freq['amplitude'] = float(freq['amplitude'])
+            
             ship_results.append(ship_result)
         
         # Return the results
@@ -417,10 +432,11 @@ class MicroMotionEstimator:
             output_dir: Directory to save the output figures
             
         Returns:
-            List of paths to the generated figures
+            Dictionary containing figure paths and base64 encoded images for frontend use
         """
         os.makedirs(output_dir, exist_ok=True)
         figure_paths = []
+        figure_data = {}
         
         # Process each ship
         for ship in results['ships']:
@@ -433,9 +449,17 @@ class MicroMotionEstimator:
             plt.colorbar(im, ax=ax, label='Displacement Magnitude')
             ax.set_title(f'Ship {ship_id} - Displacement Field')
             
-            # Save figure
+            # Save figure to disk
             fig_path = os.path.join(output_dir, f'ship_{ship_id}_displacement.png')
             plt.savefig(fig_path)
+            
+            # Also encode as base64 for frontend
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            img_str = base64.b64encode(buf.read()).decode('utf-8')
+            figure_data[f'ship_{ship_id}_displacement'] = f'data:image/png;base64,{img_str}'
+            
             plt.close(fig)
             figure_paths.append(fig_path)
             
@@ -450,13 +474,25 @@ class MicroMotionEstimator:
                 ax.set_ylabel('Amplitude')
                 ax.set_title(f'Ship {ship_id} - Dominant Frequency Modes')
                 
-                # Save figure
+                # Save figure to disk
                 fig_path = os.path.join(output_dir, f'ship_{ship_id}_frequencies.png')
                 plt.savefig(fig_path)
+                
+                # Also encode as base64 for frontend
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png')
+                buf.seek(0)
+                img_str = base64.b64encode(buf.read()).decode('utf-8')
+                figure_data[f'ship_{ship_id}_frequencies'] = f'data:image/png;base64,{img_str}'
+                
                 plt.close(fig)
                 figure_paths.append(fig_path)
         
-        return figure_paths
+        # Return both file paths and base64 data for frontend use
+        return {
+            'paths': figure_paths,
+            'base64_images': figure_data
+        }
 
 
 def main():
@@ -475,13 +511,17 @@ def main():
         print(f"Error: {results['error']}")
         sys.exit(1)
     
-    estimator.save_results(results, output_file)
-    print(f"Results saved to {output_file}")
-    
     # Generate visualizations
     output_dir = os.path.splitext(output_file)[0] + '_figures'
-    figure_paths = estimator.visualize_results(results, output_dir)
-    print(f"Generated {len(figure_paths)} visualization figures in {output_dir}")
+    figure_data = estimator.visualize_results(results, output_dir)
+    print(f"Generated {len(figure_data['paths'])} visualization figures in {output_dir}")
+    
+    # Add visualization data to the results for frontend use
+    results['visualizations'] = figure_data['base64_images']
+    
+    # Save the complete results
+    estimator.save_results(results, output_file)
+    print(f"Results saved to {output_file}")
 
 
 if __name__ == "__main__":

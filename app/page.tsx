@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ResultsViewer } from './components/ResultsViewer';
 import { SampleData } from './components/SampleData';
@@ -21,6 +21,63 @@ export default function Home() {
   const [results, setResults] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+  const [processingTime, setProcessingTime] = useState<number>(0);
+  const [estimatedTime, setEstimatedTime] = useState<string | null>(null);
+  const processingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to calculate estimated download time based on file size
+  const calculateEstimatedTime = (sizeString: string): string => {
+    // Parse size from string like "248.8 MB" or "2.7 GB"
+    const sizeMatch = sizeString.match(/(\d+(\.\d+)?)\s*(MB|GB)/);
+    if (!sizeMatch) return "Unknown";
+    
+    const size = parseFloat(sizeMatch[1]);
+    const unit = sizeMatch[3];
+    
+    // Convert to MB for calculation
+    const sizeInMB = unit === 'GB' ? size * 1024 : size;
+    
+    // Assume average download speed (adjust as needed)
+    const avgSpeedMbps = 5; // 5 Mbps
+    const avgSpeedMBps = avgSpeedMbps / 8; // Convert Mbps to MBps
+    
+    // Calculate time in seconds
+    const estimatedSeconds = sizeInMB / avgSpeedMBps;
+    
+    if (estimatedSeconds < 60) {
+      return `about ${Math.ceil(estimatedSeconds)} seconds`;
+    } else if (estimatedSeconds < 3600) {
+      return `about ${Math.ceil(estimatedSeconds / 60)} minutes`;
+    } else {
+      const hours = Math.floor(estimatedSeconds / 3600);
+      const minutes = Math.ceil((estimatedSeconds % 3600) / 60);
+      return `about ${hours} hour${hours > 1 ? 's' : ''} ${minutes > 0 ? `and ${minutes} minute${minutes > 1 ? 's' : ''}` : ''}`;
+    }
+  };
+
+  // Function to start the processing timer
+  const startProcessingTimer = () => {
+    // Clear any existing timer
+    if (processingTimerRef.current) {
+      clearInterval(processingTimerRef.current);
+    }
+    
+    setProcessingStartTime(Date.now());
+    setProcessingTime(0);
+    
+    processingTimerRef.current = setInterval(() => {
+      setProcessingTime(prevTime => prevTime + 1);
+    }, 1000);
+  };
+
+  // Function to stop the processing timer
+  const stopProcessingTimer = () => {
+    if (processingTimerRef.current) {
+      clearInterval(processingTimerRef.current);
+      processingTimerRef.current = null;
+    }
+  };
 
   const handleUpload = async (file: File) => {
     setIsUploading(true);
@@ -60,6 +117,7 @@ export default function Home() {
   const handleSampleSelect = async (sample: SampleDataItem) => {
     setIsUploading(true);
     setError(null);
+    setEstimatedTime(calculateEstimatedTime(sample.size));
     setDownloadProgress(`Downloading ${sample.name}...`);
     
     try {
@@ -68,14 +126,35 @@ export default function Home() {
       const response = await fetch(`/api/download?url=${encodeURIComponent(sample.url)}`);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.details || `Server error: ${response.status}`);
+        const errorData = await response.json().catch((parseError) => {
+          console.error('Error parsing error response:', parseError);
+          return { error: `Failed to parse error response: ${response.status} ${response.statusText}` };
+        });
+        
+        console.error('API Error Response:', errorData);
+        throw new Error(
+          errorData.error || 
+          errorData.details || 
+          `Server error: ${response.status} ${response.statusText}`
+        );
       }
+      
+      // Download complete, now processing
+      setDownloadProgress(`Processing ${sample.name}...`);
+      setEstimatedTime(null);
+      startProcessingTimer();
       
       const data = await response.json();
       
       if (!data.success) {
-        throw new Error(data.error || 'Processing failed');
+        console.error('API Returned Unsuccessful Response:', data);
+        throw new Error(data.error || data.details || 'Processing failed');
+      }
+      
+      // If the API returned timing data, use it
+      if (data.timing) {
+        setProcessingTime(Math.round(data.timing.processingTime));
+        console.log(`Actual download time: ${data.timing.downloadTime}s, processing time: ${data.timing.processingTime}s`);
       }
       
       setResults(data);
@@ -84,10 +163,21 @@ export default function Home() {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       setResults(null);
     } finally {
+      stopProcessingTimer();
       setIsUploading(false);
       setDownloadProgress(null);
+      setEstimatedTime(null);
     }
   };
+
+  // Clean up the timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (processingTimerRef.current) {
+        clearInterval(processingTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -112,7 +202,15 @@ export default function Home() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span className="text-blue-700">{downloadProgress}</span>
+                  <div className="flex flex-col">
+                    <span className="text-blue-700">{downloadProgress}</span>
+                    {estimatedTime && (
+                      <span className="text-sm text-blue-600">Estimated time: {estimatedTime}</span>
+                    )}
+                    {processingTime > 0 && (
+                      <span className="text-sm text-blue-600">Processing time: {processingTime} seconds</span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
