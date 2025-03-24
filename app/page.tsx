@@ -5,7 +5,8 @@ import { FileUpload } from './components/FileUpload';
 import { ResultsViewer } from './components/ResultsViewer';
 import { SampleData } from './components/SampleData';
 import { MotionVisualization } from './components/MotionVisualization';
-import { ApiResponse } from './types';
+import { ImageVisualization } from './components/ImageVisualization';
+import { ApiResponse, ShipResult } from './types';
 
 interface SampleDataItem {
   name: string;
@@ -129,15 +130,27 @@ export default function Home() {
               <ResultsViewer data={results} />
             </section>
           ) : (
-            <section className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-bold mb-4">Sample Visualization</h2>
-              <div className="p-4 bg-gray-50 rounded-md mb-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  This is a sample visualization. Upload a SAR image or select a sample dataset to see actual results.
-                </p>
-              </div>
-              <MotionVisualization showMockData={true} />
-            </section>
+            <div className="space-y-8">
+              <section className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-bold mb-4">Sample SAR Image Visualization</h2>
+                <div className="p-4 bg-gray-50 rounded-md mb-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    This is a sample SAR image visualization. Upload a real SAR image or select a sample dataset to see actual results.
+                  </p>
+                </div>
+                <ImageVisualization showMockData={true} ships={generateMockShips()} />
+              </section>
+              
+              <section className="bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-bold mb-4">Sample Motion Analysis</h2>
+                <div className="p-4 bg-gray-50 rounded-md mb-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    This is a sample motion visualization. Upload a SAR image or select a sample dataset to see actual results.
+                  </p>
+                </div>
+                <MotionVisualization showMockData={true} />
+              </section>
+            </div>
           )}
           
           <section className="bg-white p-6 rounded-lg shadow-md">
@@ -174,4 +187,58 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+// Helper function to generate mock ships for the visualization example
+function generateMockShips(): ShipResult[] {
+  return [
+    {
+      ship_id: 0,
+      region: [150, 170, 100, 150] as [number, number, number, number],
+      displacement_field: {
+        range_offsets: [],
+        azimuth_offsets: [],
+        magnitude: []
+      },
+      dominant_frequencies: [
+        {
+          frequency: [0.1253, 0.2145] as [number, number],
+          amplitude: 1.8,
+          peak_location: [120, 240] as [number, number]
+        }
+      ]
+    },
+    {
+      ship_id: 1,
+      region: [190, 210, 250, 300] as [number, number, number, number],
+      displacement_field: {
+        range_offsets: [],
+        azimuth_offsets: [],
+        magnitude: []
+      },
+      dominant_frequencies: [
+        {
+          frequency: [0.0532, 0.1643] as [number, number],
+          amplitude: 1.2,
+          peak_location: [135, 255] as [number, number]
+        }
+      ]
+    },
+    {
+      ship_id: 2,
+      region: [230, 250, 400, 450] as [number, number, number, number],
+      displacement_field: {
+        range_offsets: [],
+        azimuth_offsets: [],
+        magnitude: []
+      },
+      dominant_frequencies: [
+        {
+          frequency: [0.1863, 0.0897] as [number, number],
+          amplitude: 0.75,
+          peak_location: [150, 220] as [number, number]
+        }
+      ]
+    }
+  ];
 }

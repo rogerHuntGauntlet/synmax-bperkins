@@ -2,6 +2,7 @@
 
 import { ApiResponse, ProcessingResult, ShipResult } from '../types';
 import { MotionVisualization } from './MotionVisualization';
+import { ImageVisualization } from './ImageVisualization';
 
 interface ResultsViewerProps {
   data: ApiResponse;
@@ -20,6 +21,9 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
   const { results, figures } = data;
   const { metadata, ships } = results;
   const sessionId = data.id || data.sessionId || 'unknown';
+
+  // Find the main SAR image from figures if available
+  const mainImage = figures && (figures.original_image || figures.sar_image || Object.values(figures)[0]);
 
   return (
     <div className="space-y-8">
@@ -44,6 +48,15 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
         </div>
       </div>
 
+      {/* Display SAR image visualization */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-xl font-bold mb-4">SAR Image Area</h2>
+        <ImageVisualization 
+          imageData={mainImage} 
+          ships={ships}
+        />
+      </div>
+
       {/* Display interactive visualizations for ships */}
       {ships.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -59,25 +72,27 @@ export const ResultsViewer = ({ data }: ResultsViewerProps) => {
         </div>
       )}
 
-      {/* Display base64 encoded figures */}
-      {figures && Object.keys(figures).length > 0 && (
+      {/* Display other base64 encoded figures */}
+      {figures && Object.keys(figures).length > 1 && (
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-bold mb-4">Visualizations</h2>
+          <h2 className="text-xl font-bold mb-4">Additional Visualizations</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Object.entries(figures).map(([key, imgData]) => (
-              <div key={key} className="border rounded overflow-hidden">
-                <h3 className="text-md font-medium p-2 bg-gray-50 border-b capitalize">
-                  {key.replace(/_/g, ' ')}
-                </h3>
-                <div className="p-2">
-                  <img 
-                    src={imgData} 
-                    alt={`${key} visualization`} 
-                    className="w-full h-auto"
-                  />
+            {Object.entries(figures)
+              .filter(([key]) => !['original_image', 'sar_image'].includes(key))
+              .map(([key, imgData]) => (
+                <div key={key} className="border rounded overflow-hidden">
+                  <h3 className="text-md font-medium p-2 bg-gray-50 border-b capitalize">
+                    {key.replace(/_/g, ' ')}
+                  </h3>
+                  <div className="p-2">
+                    <img 
+                      src={imgData} 
+                      alt={`${key} visualization`} 
+                      className="w-full h-auto"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       )}
