@@ -48,8 +48,11 @@ async def process_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     
     try:
         # Process with your existing code
-        estimator = MicroMotionEstimator(temp_path, result_path)
-        results = estimator.process()
+        estimator = MicroMotionEstimator(config={
+            "input_file": temp_path,
+            "output_file": result_path
+        })
+        results = estimator.process_image(temp_path)
         
         # Save results to JSON file for debugging
         with open(result_path, "w") as f:
@@ -58,19 +61,21 @@ async def process_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # Generate figures and convert to base64
         figures = {}
         
-        # Example for displacement figure
-        disp_path = os.path.join(results_dir, "displacement.png")
-        print(f"Generating displacement plot: {disp_path}")
-        estimator.plot_displacement_field(disp_path)
-        with open(disp_path, "rb") as img:
-            figures["displacement"] = f"data:image/png;base64,{base64.b64encode(img.read()).decode()}"
+        # Create visualization directory
+        vis_dir = os.path.join(results_dir, "visualizations")
+        os.makedirs(vis_dir, exist_ok=True)
         
-        # Example for frequency figure
-        freq_path = os.path.join(results_dir, "frequency.png")
-        print(f"Generating frequency plot: {freq_path}")
-        estimator.plot_frequency_modes(freq_path)
-        with open(freq_path, "rb") as img:
-            figures["frequency"] = f"data:image/png;base64,{base64.b64encode(img.read()).decode()}"
+        # Generate visualizations
+        print(f"Generating visualizations in: {vis_dir}")
+        estimator.visualize_results(results, vis_dir)
+        
+        # Convert visualization files to base64
+        for img_name in os.listdir(vis_dir):
+            if img_name.endswith(".png"):
+                img_path = os.path.join(vis_dir, img_name)
+                key = os.path.splitext(img_name)[0]
+                with open(img_path, "rb") as img:
+                    figures[key] = f"data:image/png;base64,{base64.b64encode(img.read()).decode()}"
         
         print("Processing complete, returning results")
         return {
